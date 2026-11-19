@@ -11,7 +11,9 @@ jobs:
       - name: Cache da toolchain
         id: cache
         uses: actions/cache@v4
-        with: { path: /usr/local/xenon, key: xenon-toolchain-v1 }
+        with:
+          path: /usr/local/xenon
+          key: xenon-toolchain-v1
       - name: Construir toolchain libxenon
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
@@ -26,5 +28,8 @@ jobs:
           export DEVKITXENON=/usr/local/xenon
           export PATH=$PATH:$DEVKITXENON/bin
           make -C client
-      - uses: actions/upload-artifact@v4
-        with: { name: nimbo-cliente, path: "client/*.elf*" }
+      - name: Guardar o resultado
+        uses: actions/upload-artifact@v4
+        with:
+          name: nimbo-cliente
+          path: client/*.elf*
