@@ -1,5 +1,5 @@
 // Plataforma libxenon (Xbox 360 RGH/JTAG). ATENCAO: escrito de memoria, nao
-// foi compilado. Pontos marcados VERIFICAR dependem da versao da libxenon.
+// foi testado. Pontos marcados VERIFICAR dependem da versao da libxenon.
 #include "platform.h"
 #include <stdio.h>
 #include <string.h>
@@ -12,7 +12,13 @@
 #include <xenon_sound/sound.h>
 #include <time/time.h>
 #include <ppc/timebase.h>
-#include <jpeglib.h>          // VERIFICAR: libjpeg portada para libxenon
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_ONLY_JPEG
+#define STBI_NO_STDIO
+#define STBI_NO_HDR
+#define STBI_NO_LINEAR
+#define STBI_NO_SIMD
+#include "stb_image.h"
 #define VW 1280
 #define VH 720
 static uint32_t *rgba;        // quadro decodificado (ARGB)
@@ -38,18 +44,15 @@ int plat_pad(pad_t *p) {
 }
 
 void plat_draw_jpeg(const uint8_t *d, size_t n) {
-  struct jpeg_decompress_struct ci; struct jpeg_error_mgr je;
-  ci.err = jpeg_std_error(&je); jpeg_create_decompress(&ci);
-  jpeg_mem_src(&ci, (unsigned char *)d, n);
-  if (jpeg_read_header(&ci, TRUE) != JPEG_HEADER_OK) { jpeg_destroy_decompress(&ci); return; }
-  ci.out_color_space = JCS_RGB; jpeg_start_decompress(&ci);
-  unsigned char *row = malloc(ci.output_width * 3);
-  while (ci.output_scanline < ci.output_height && ci.output_scanline < VH) {
-    int y = ci.output_scanline; jpeg_read_scanlines(&ci, &row, 1);
-    for (unsigned x = 0; x < ci.output_width && x < VW; x++)
-      rgba[y * VW + x] = 0xFF000000 | row[x * 3] << 16 | row[x * 3 + 1] << 8 | row[x * 3 + 2];
-  }
-  free(row); jpeg_finish_decompress(&ci); jpeg_destroy_decompress(&ci);
+  int w, h, c;
+  unsigned char *px = stbi_load_from_memory(d, (int)n, &w, &h, &c, 4);
+  if (!px) return;
+  for (int y = 0; y < h && y < VH; y++)
+    for (int x = 0; x < w && x < VW; x++) {
+      unsigned char *p = px + (y * w + x) * 4;
+      rgba[y * VW + x] = 0xFF000000 | p[0] << 16 | p[1] << 8 | p[2];
+    }
+  stbi_image_free(px);
 }
 void plat_clear(void) { console_clrscr(); }
 void plat_line(const char *s, int hl) { printf(hl ? "> %s\n" : "  %s\n", s); }
@@ -60,11 +63,13 @@ void plat_present(void) {
 void plat_audio(const uint8_t *pcm, size_t n) {
   // Audio do servidor: s16le estereo 24000 Hz. Saida da libxenon: 48000 Hz,
   // entao duplicamos cada amostra. VERIFICAR ordem de bytes (PPC e big-endian).
-  static int16_t out[1 << 16]; size_t ns = n / 4; if (ns > (sizeof out / sizeof *out) / 4) ns = (sizeof out / sizeof *out) / 4;
-  const uint8_t *s = pcm;
+  static int16_t out[1 << 16];
+  size_t ns = n / 4;
+  if (ns > (sizeof out / sizeof *out) / 4) ns = (sizeof out / sizeof *out) / 4;
   for (size_t i = 0; i < ns; i++) {
-    int16_t l = s[i * 4] | s[i * 4 + 1] << 8, r = s[i * 4 + 2] | s[i * 4 + 3] << 8;
-    out[i * 4] = out[i * 4 + 2] = l; out[i * 4 + 1] = out[i * 4 + 3] = r;
+    int16_t l = pcm[i * 4] | pcm[i * 4 + 1] << 8, r = pcm[i * 4 + 2] | pcm[i * 4 + 3] << 8;
+    out[i * 4] = out[i * 4 + 2] = l;
+    out[i * 4 + 1] = out[i * 4 + 3] = r;
   }
   xenon_sound_submit(out, ns * 8);
 }
