@@ -13,7 +13,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /usr/local/xenon
-          key: xenon-toolchain-v1
+          key: xenon-toolchain-v2
       - name: Construir toolchain libxenon
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
@@ -23,19 +23,29 @@ jobs:
           ./build-xenon-toolchain toolchain
           ./build-xenon-toolchain libxenon
           ./build-xenon-toolchain libs
+      - name: Ajustar permissoes
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: sudo chown -R $USER /usr/local/xenon && sudo chmod -R a+rX /usr/local/xenon
       - name: Guardar toolchain
         if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: /usr/local/xenon
-          key: xenon-toolchain-v1
+          key: xenon-toolchain-v2
       - name: Baixar stb_image
         run: wget -O client/src/stb_image.h https://raw.githubusercontent.com/nothings/stb/master/stb_image.h
       - name: Diagnostico de rede
         run: |
-          find /usr/local/xenon \( -name "sockets.h" -o -name "socket.h" \) | head -10
-          grep -rln "struct sockaddr_in" /usr/local/xenon --include=*.h | head -10
-          grep -rn "define recv\b\|define connect\b" /usr/local/xenon --include=*.h | head -10
+          {
+            echo '## Diagnostico de rede'
+            echo '```'
+            find /usr/local/xenon -iname '*socket*' | head -20
+            echo '--- cabecalhos network ---'
+            find /usr/local/xenon -path '*network*' -name '*.h' | head -20
+            echo '--- sockaddr_in ---'
+            grep -rl 'sockaddr_in' /usr/local/xenon --include=*.h | head -20
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Compilar o cliente
         run: |
           export DEVKITXENON=/usr/local/xenon
