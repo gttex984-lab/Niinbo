@@ -31,8 +31,11 @@ jobs:
           key: xenon-toolchain-v1
       - name: Baixar stb_image
         run: wget -O client/src/stb_image.h https://raw.githubusercontent.com/nothings/stb/master/stb_image.h
-      - name: Listar cabecalhos de rede
-        run: find /usr/local/xenon \( -name "sockets.h" -o -name "socket.h" \) | head -20
+      - name: Diagnostico de rede
+        run: |
+          find /usr/local/xenon \( -name "sockets.h" -o -name "socket.h" \) | head -10
+          grep -rln "struct sockaddr_in" /usr/local/xenon --include=*.h | head -10
+          grep -rn "define recv\b\|define connect\b" /usr/local/xenon --include=*.h | head -10
       - name: Compilar o cliente
         run: |
           export DEVKITXENON=/usr/local/xenon
