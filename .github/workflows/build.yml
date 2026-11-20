@@ -1,5 +1,5 @@
 name: compilar-nimbo
-on: workflow_dispatch
+on: [workflow_dispatch, push]
 jobs:
   build:
     runs-on: ubuntu-22.04
