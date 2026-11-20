@@ -1,3 +1,4 @@
+// Cliente WebSocket minimo (sem TLS, sem fragmentacao), so IPv4 por IP.
 #include "ws.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,6 +14,10 @@
 #include <lwip/inet.h>
 #define close lwip_close
 #endif
+
+#define CAP (1 << 20)
+static int fd = -1;
+static uint8_t *buf;
 
 static int rd(void *p, size_t n) {
   uint8_t *q = p;
