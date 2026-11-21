@@ -8,6 +8,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Dependencias
         run: sudo apt-get update && sudo apt-get install -y build-essential git wget texinfo flex bison libgmp-dev libmpfr-dev libmpc-dev libtool autoconf automake
+      - name: Preparar pasta da toolchain
+        run: sudo mkdir -p /usr/local/xenon && sudo chown -R $USER /usr/local/xenon
       - name: Restaurar toolchain
         id: cache
         uses: actions/cache/restore@v4
@@ -19,7 +21,6 @@ jobs:
         run: |
           git clone https://github.com/Free60Project/libxenon.git
           cd libxenon/toolchain
-          sudo mkdir -p /usr/local/xenon && sudo chown $USER /usr/local/xenon
           ./build-xenon-toolchain toolchain
           ./build-xenon-toolchain libxenon
           ./build-xenon-toolchain libs
@@ -34,23 +35,15 @@ jobs:
           key: xenon-toolchain-v2
       - name: Baixar stb_image
         run: wget -O client/src/stb_image.h https://raw.githubusercontent.com/nothings/stb/master/stb_image.h
-      - name: Diagnostico de rede
-        run: |
-          {
-            echo '## Diagnostico de rede'
-            echo '```'
-            find /usr/local/xenon -iname '*socket*' | head -20
-            echo '--- cabecalhos network ---'
-            find /usr/local/xenon -path '*network*' -name '*.h' | head -20
-            echo '--- sockaddr_in ---'
-            grep -rl 'sockaddr_in' /usr/local/xenon --include=*.h | head -20
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
       - name: Compilar o cliente
         run: |
           export DEVKITXENON=/usr/local/xenon
           export PATH=$PATH:$DEVKITXENON/bin
-          make -C client
+          set +e
+          make -C client > build.log 2>&1
+          code=$?
+          { echo '## Log da compilacao'; echo '```'; tail -40 build.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $code
       - name: Guardar o resultado
         uses: actions/upload-artifact@v4
         with:
