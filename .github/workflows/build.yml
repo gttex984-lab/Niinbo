@@ -24,23 +24,30 @@ jobs:
           ./build-xenon-toolchain toolchain
           ./build-xenon-toolchain libxenon
           ./build-xenon-toolchain libs
-      - name: Ajustar permissoes
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: sudo chown -R $USER /usr/local/xenon && sudo chmod -R a+rX /usr/local/xenon
-      - name: Guardar toolchain
-        if: steps.cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: /usr/local/xenon
-          key: xenon-toolchain-v2
       - name: Baixar stb_image
         run: wget -O client/src/stb_image.h https://raw.githubusercontent.com/nothings/stb/master/stb_image.h
       - name: Compilar o cliente
         run: |
-          export DEVKITXENON=/usr/local/xenon
-          export PATH=$PATH:$DEVKITXENON/bin
+          X=/usr/local/xenon
+          export PATH=$PATH:$X/bin
+          LDS=$(find $X -name '*.lds' | head -1)
+          {
+            echo '## Diagnostico'
+            echo '```'
+            echo "script de ligacao: $LDS"
+            find $X -name '*.lds' -o -name '*.mk' | head -10
+            echo '--- libs ---'
+            ls $X/usr/lib | head -30
+            echo '--- libxenon.a ---'
+            xenon-readelf -h $X/usr/lib/libxenon.a 2>&1 | grep -m3 -i 'class\|machine\|flags'
+            echo '--- Makefile do client ---'
+            head -3 client/Makefile
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
           set +e
-          make -C client > build.log 2>&1
+          xenon-gcc -O2 -Wall -m32 -mno-altivec -mhard-float -DXENON -I$X/usr/include \
+            -o client/nimbo.elf client/src/main.c client/src/ws.c client/src/platform_xenon.c \
+            -n ${LDS:+-T $LDS} -L$X/usr/lib -lxenon -lm > build.log 2>&1
           code=$?
           { echo '## Log da compilacao'; echo '```'; tail -40 build.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           exit $code
