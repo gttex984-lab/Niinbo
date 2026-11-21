@@ -30,24 +30,21 @@ jobs:
         run: |
           X=/usr/local/xenon
           export PATH=$PATH:$X/bin
-          LDS=$(find $X -name '*.lds' | head -1)
           {
             echo '## Diagnostico'
             echo '```'
-            echo "script de ligacao: $LDS"
-            find $X -name '*.lds' -o -name '*.mk' | head -10
-            echo '--- libs ---'
-            ls $X/usr/lib | head -30
-            echo '--- libxenon.a ---'
-            xenon-readelf -h $X/usr/lib/libxenon.a 2>&1 | grep -m3 -i 'class\|machine\|flags'
-            echo '--- Makefile do client ---'
-            head -3 client/Makefile
+            echo '--- xenon/lib ---'
+            ls $X/xenon/lib | head -30
+            echo '--- xenon/lib/32 ---'
+            ls $X/xenon/lib/32 2>&1 | head -30
+            echo '--- libc.a ---'
+            find $X -name libc.a | head -10
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           set +e
-          xenon-gcc -O2 -Wall -m32 -mno-altivec -mhard-float -DXENON -I$X/usr/include \
+          xenon-gcc -O2 -Wall -m32 -mno-altivec -mhard-float -mpowerpc64 -fno-pic -DXENON -I$X/usr/include \
             -o client/nimbo.elf client/src/main.c client/src/ws.c client/src/platform_xenon.c \
-            -n ${LDS:+-T $LDS} -L$X/usr/lib -lxenon -lm > build.log 2>&1
+            -n -T $X/app.lds -L$X/usr/lib -L$X/xenon/lib/32 -lxenon -lm > build.log 2>&1
           code=$?
           { echo '## Log da compilacao'; echo '```'; tail -40 build.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           exit $code
